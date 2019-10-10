@@ -16,7 +16,7 @@ import argparse
 import pathlib
 import tensorflow as tf
 from tensorflow.keras import layers, models
-from interaction import InteractionModel
+from interaction import LEIA
 
 os.environ['HDF5_USE_FILE_LOCKING'] = 'FALSE'
 if os.path.isdir('/data/shared/hls-fml/'):
@@ -66,11 +66,16 @@ def main(args):
     net_args = (N, n_targets, n_features, args.hidden)
     net_kwargs = {"fr_activation": 0, "fo_activation": 0, "fc_activation": 0}
     
-    gnn = InteractionModel(*net_args, **net_kwargs)
+    gnn = LEIA(*net_args, **net_kwargs)
+    gnn.build(input_shape=(None, N, n_features))
     
+    # gnn.summary() # Doens't work. Seems like a common TF 2.0 issue: 
+    # https://github.com/tensorflow/tensorflow/issues/22963 
+    # https://stackoverflow.com/questions/58182032/you-tried-to-call-count-params-on-but-the-layer-isnt-built-tensorflow-2-0
+
     #### Start training ####
     
-    n_epochs = 1
+    n_epochs = 5
     # Keep results for plotting
     train_loss_results = []
     train_accuracy_results = []

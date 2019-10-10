@@ -8,9 +8,9 @@ import tensorflow as tf
 from tensorflow.keras import layers, models
 import numpy as np
 
-class InteractionModel(models.Model):
+class LEIA(models.Model):
     def __init__(self, n_constituents, n_targets, params, hidden, fr_activation=0, fo_activation=0, fc_activation=0, sum_O=True):
-        super(InteractionModel, self).__init__()
+        super(LEIA, self).__init__()
         self.hidden = int(hidden)
         self.P = params
         self.N = n_constituents
