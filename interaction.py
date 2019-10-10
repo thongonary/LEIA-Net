@@ -37,7 +37,11 @@ class InteractionModel(models.Model):
         self.fc2 = layers.Dense(int(hidden/2))
         self.fc3 = layers.Dense(self.n_targets)
         self.sum_O = sum_O 
-    
+
+    def build(self, input_shape):
+        assert len(input_shape) >= 2
+        self.built = True
+
     def assign_matrices(self):
         Rr = np.zeros([self.N, self.Nr], dtype=np.float32)
         Rs = np.zeros([self.N, self.Nr], dtype=np.float32)
@@ -81,7 +85,6 @@ class InteractionModel(models.Model):
         C = tf.concat([x, Ebar], 1)
         del Ebar
         C = tf.transpose(C, perm=[0, 2, 1])
-        print(f"C {C.shape}")
         
         ### Second MLP ###
         if self.fo_activation == 2:
@@ -120,7 +123,6 @@ class InteractionModel(models.Model):
             else:
                 N = tf.nn.relu(self.fc1(tf.reshape(O, [-1, self.Do * N])))
             N = tf.nn.relu(self.fc2(N))
-        print(f"N {N.shape}")
         N = self.fc3(N)
         return N
 
