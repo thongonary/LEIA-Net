@@ -28,8 +28,7 @@ elif os.path.isdir('/eos/project/d/dshep/hls-fml/'):
 
 N = 100 # number of particles
 n_targets = 5 # number of classes
-n_features = 4
-
+n_features = 4 # number of features per particles
 
 def main(args):
     """ Main entry point of the app """
@@ -182,7 +181,7 @@ if __name__ == "__main__":
     # Required positional arguments
     
     # Optional arguments
-    parser.add_argument("--hidden", type=int, action='store', dest='hidden', default = 15, help="hidden")
+    parser.add_argument("--hidden", type=int, action='store', dest='hidden', default = 16, help="hidden")
 
     args = parser.parse_args()
     main(args)

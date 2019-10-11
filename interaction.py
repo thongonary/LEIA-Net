@@ -7,13 +7,18 @@ import itertools
 import tensorflow as tf
 from tensorflow.keras import layers, models
 import numpy as np
+from lbn import LBNLayer
 
 class LEIA(models.Model):
-    def __init__(self, n_constituents, n_targets, params, hidden, fr_activation=0, fo_activation=0, fc_activation=0, sum_O=True):
+    def __init__(self, n_constituents, n_targets, params, hidden, fr_activation=0, fo_activation=0, fc_activation=0, sum_O=True, debug=False):
         super(LEIA, self).__init__()
+
+        # initialize the LBN layer for preprocessing
+        self.lbn = LBNLayer(n_particles=n_constituents, n_restframes=n_constituents, boost_mode='pairs')
+
         self.hidden = int(hidden)
         self.P = params
-        self.N = n_constituents
+        self.N = self.lbn.lbn.n_out
         self.Nr = self.N * (self.N - 1)
         self.Dr = 0
         self.De = 8
@@ -37,6 +42,7 @@ class LEIA(models.Model):
         self.fc2 = layers.Dense(int(hidden/2))
         self.fc3 = layers.Dense(self.n_targets)
         self.sum_O = sum_O 
+        self.debug = debug
 
     def build(self, input_shape):
         assert len(input_shape) >= 2
@@ -58,15 +64,21 @@ class LEIA(models.Model):
         Expect input to have shape of (batches, N_particles, N_features)
         '''
         ###PF Candidate - PF Candidate###
-        x = tf.transpose(x, perm=[0, 2, 1])
-        print(f"x = {x.shape}")
+        if self.debug: print("input_shape = {}".format(x.shape))
+        x = self.lbn(x) # Already in E, px, py, pz
+        if self.debug: 
+            print("input_shape after lbn = {}".format(x.shape))
+            print("n_outs after lbn = {}".format(self.lbn.lbn.n_out))
+        x = tf.transpose(x, perm=[0, 2, 1]) # to fit in the IN
+        if self.debug: print(f"x after transpose = {x.shape}")
         Orr = self.tmul(x, self.Rr)
-        print(f"Orr = {Orr.shape}")
+        if self.debug: print(f"Orr = {Orr.shape}")
         Ors = self.tmul(x, self.Rs)
-        print(f"Ors = {Ors.shape}")
+        if self.debug: print(f"Ors = {Ors.shape}")
         B = tf.concat([Orr, Ors], 1)
-        print(f"B = {B.shape}")
-        print(f"params = {self.P}")
+        if self.debug: 
+            print(f"B = {B.shape}")
+            print(f"params = {self.P}")
         ### First MLP ###
         B = tf.transpose(B, perm=[0, 2, 1])
         if self.fr_activation == 2:
@@ -79,16 +91,19 @@ class LEIA(models.Model):
             E = tf.nn.elu(tf.reshape(self.fr3(B), [-1, self.Nr, self.De]))
         else:
             B = tf.nn.relu(self.fr1(tf.reshape(B, [-1, 2 * self.P + self.Dr])))
-            print(f"B after fr1 = {B.shape}")
+            if self.debug: print(f"B after fr1 = {B.shape}")
             B = tf.nn.relu(self.fr2(B))
-            print(f"B after fr2 = {B.shape}")
+            if self.debug: print(f"B after fr2 = {B.shape}")
             E = tf.nn.relu(tf.reshape(self.fr3(B), [-1, self.Nr, self.De]))
-            print(f"E after fr3 = {E.shape}")
+            if self.debug: print(f"E after fr3 = {E.shape}")
         del B
+        if self.debug: print("E after 1st MLP = {}".format(E.shape))
         E = tf.transpose(E, perm=[0, 2, 1])
-        print(f"E after transpose = {E.shape}")
+        if self.debug:
+            print("E after transpose = {}".format(E.shape))
+            print("Rr after transpose = {}".format(self.Rr.shape))
         Ebar = self.tmul(E, tf.transpose(self.Rr, perm=[1, 0]))
-        print(f"Ebar after tmul = {Ebar.shape}")
+        if self.debug: print("Ebar after tmul = {}".format(Ebar.shape))
         del E
        
         ####Final output matrix for particles###
