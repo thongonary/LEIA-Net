@@ -75,6 +75,7 @@ class LEIA(models.Model):
         print(f"Ors = {Ors.shape}")
         B = tf.concat([Orr, Ors], 1)
         print(f"B = {B.shape}")
+        print(f"params = {self.P}")
         ### First MLP ###
         B = tf.transpose(B, perm=[0, 2, 1])
         if self.fr_activation == 2:
