@@ -32,7 +32,7 @@ n_targets = 5 # number of classes
 n_features = 4 # number of features per particles
 save_path = 'models/2/'
 batch_size = 256
-n_epochs = 20
+n_epochs = 100
 
 files = glob.glob(train_path + "/jetImage*_{}p*.h5".format(N))
 num_files = len(files)
@@ -89,7 +89,7 @@ def main(args):
     val_accuracy_results = []
     
     # Log directory for Tensorboard
-    current_time = datetime.datetime.now().strftime("%Y%m%d")
+    current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     train_log_dir = 'logs/gradient_tape/' + current_time + '/train'
     test_log_dir = 'logs/gradient_tape/' + current_time + '/test'
     pathlib.Path(train_log_dir).mkdir(parents=True, exist_ok=True)  
