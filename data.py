@@ -121,7 +121,12 @@ class Data(object):
                cur_file_features, cur_file_labels = self.load_data(cur_file_name)
            # concatenate any leftover data from the previous file
            if leftovers is not None:
-               cur_file_features = self.concat_data( leftovers[0], cur_file_features )
+               try:
+                   cur_file_features = self.concat_data( leftovers[0], cur_file_features )
+               except ValueError as e:
+                    print(f"leftovers[0] = {leftovers[0].shape}")
+                    print(f"cur_file_features = {cur_file_features.shape}")
+                    raise e
                cur_file_labels = self.concat_data( leftovers[1], cur_file_labels )
                if self.spectators:
                    cur_file_spectators = self.concat_data( leftovers[2], cur_file_spectators)                   
