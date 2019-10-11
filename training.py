@@ -28,7 +28,7 @@ elif os.path.isdir('/eos/project/d/dshep/hls-fml/'):
 
 N = 100 # number of particles
 n_targets = 5 # number of classes
-n_features = 16
+n_features = 4
 
 
 def main(args):
@@ -104,7 +104,7 @@ def main(args):
         for sub_X, sub_Y in tqdm.tqdm(data_train.generate_data(),total = n_train/batch_size):
 #            print(f"sub_X: {sub_X.shape}")
 #            print(f"sub_Y: {sub_Y.shape}")
-            training = sub_X.astype(np.float32)
+            training = sub_X.astype(np.float32)[:,:,[3,0,1,2]]
             target = sub_Y.astype(np.float32)[:,-6:-1]
             # Define loss function
             cce = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
@@ -132,7 +132,7 @@ def main(args):
 
         # Validation
         for sub_X, sub_Y in tqdm.tqdm(data_val.generate_data(),total = n_val/batch_size):
-            training = sub_X.astype(np.float32)
+            training = sub_X.astype(np.float32)[:,:,[3,0,1,2]]
             target = sub_Y.astype(np.float32)[:,-6:-1]
             
             

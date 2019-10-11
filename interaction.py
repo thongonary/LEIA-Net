@@ -59,9 +59,13 @@ class LEIA(models.Model):
         '''
         ###PF Candidate - PF Candidate###
         x = tf.transpose(x, perm=[0, 2, 1])
+        print(f"x = {x.shape}")
         Orr = self.tmul(x, self.Rr)
+        print(f"Orr = {Orr.shape}")
         Ors = self.tmul(x, self.Rs)
+        print(f"Ors = {Ors.shape}")
         B = tf.concat([Orr, Ors], 1)
+        print(f"B = {B.shape}")
         ### First MLP ###
         B = tf.transpose(B, perm=[0, 2, 1])
         if self.fr_activation == 2:
@@ -74,11 +78,16 @@ class LEIA(models.Model):
             E = tf.nn.elu(tf.reshape(self.fr3(B), [-1, self.Nr, self.De]))
         else:
             B = tf.nn.relu(self.fr1(tf.reshape(B, [-1, 2 * self.P + self.Dr])))
+            print(f"B after fr1 = {B.shape}")
             B = tf.nn.relu(self.fr2(B))
+            print(f"B after fr2 = {B.shape}")
             E = tf.nn.relu(tf.reshape(self.fr3(B), [-1, self.Nr, self.De]))
+            print(f"E after fr3 = {E.shape}")
         del B
         E = tf.transpose(E, perm=[0, 2, 1])
+        print(f"E after transpose = {E.shape}")
         Ebar = self.tmul(E, tf.transpose(self.Rr, perm=[1, 0]))
+        print(f"Ebar after tmul = {Ebar.shape}")
         del E
        
         ####Final output matrix for particles###
