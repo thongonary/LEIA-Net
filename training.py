@@ -28,7 +28,7 @@ elif os.path.isdir('/eos/project/d/dshep/hls-fml/'):
 
 N = 100 # number of particles
 n_targets = 5 # number of classes
-n_features = 16
+n_features = 4 # number of features per particles
 
 
 def main(args):
