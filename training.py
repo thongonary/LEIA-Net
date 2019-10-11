@@ -17,6 +17,7 @@ import pathlib
 import tensorflow as tf
 from tensorflow.keras import layers, models
 from interaction import LEIA
+from data import H5Data
 
 os.environ['HDF5_USE_FILE_LOCKING'] = 'FALSE'
 if os.path.isdir('/data/shared/hls-fml/'):
@@ -29,33 +30,40 @@ elif os.path.isdir('/eos/project/d/dshep/hls-fml/'):
 N = 100 # number of particles
 n_targets = 5 # number of classes
 n_features = 4 # number of features per particles
+save_path = 'models/2/'
+batch_size = 256
+n_epochs = 20
+
+files = glob.glob(train_path + "/jetImage*_{}p*.h5".format(N))
+num_files = len(files)
+files_val = files[:int(num_files*0.2)] # take first 20% for validation
+files_train = files[int(num_files*0.2):] # take rest for training
+    
+data_train = H5Data(batch_size = batch_size,
+                    cache = None,
+                    preloading=0,
+                    features_name='jetConstituentList', 
+                    labels_name='jets',
+                    spectators_name=None)
+data_val = H5Data(batch_size = batch_size,
+                  cache = None,
+                  preloading=0,
+                  features_name='jetConstituentList', 
+                  labels_name='jets',
+                  spectators_name=None)
+
+            
+# Define loss function
+def loss(model, x, y):
+    cce = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
+    y_ = model(x)
+    return cce(y_true=y, y_pred=y_)
 
 def main(args):
     """ Main entry point of the app """
-    
-    from data import H5Data
-    files = glob.glob(train_path + "/jetImage*_{}*.h5".format(N))
-    files_val = files[4:5] # take first 5 for validation
-    files_train = files[5:6] # take rest for training
-    
-    label = 'new'
-
-    batch_size = 256
-    data_train = H5Data(batch_size = batch_size,
-                        cache = None,
-                        preloading=0,
-                        features_name='jetConstituentList', 
-                        labels_name='jets',
-                        spectators_name=None)
     data_train.set_file_names(files_train)
-    data_val = H5Data(batch_size = batch_size,
-                      cache = None,
-                      preloading=0,
-                      features_name='jetConstituentList', 
-                      labels_name='jets',
-                      spectators_name=None)
     data_val.set_file_names(files_val)
-
+    
     n_val=data_val.count_data()
     n_train=data_train.count_data()
 
@@ -74,7 +82,6 @@ def main(args):
 
     #### Start training ####
     
-    n_epochs = 5
     # Keep results for plotting
     train_loss_results = []
     train_accuracy_results = []
@@ -105,11 +112,6 @@ def main(args):
 #            print(f"sub_Y: {sub_Y.shape}")
             training = sub_X.astype(np.float32)[:,:,[3,0,1,2]]
             target = sub_Y.astype(np.float32)[:,-6:-1]
-            # Define loss function
-            cce = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
-            def loss(model, x, y):
-                y_ = model(x)
-                return cce(y_true=y, y_pred=y_)
             def grad(model, input_par, targets):
                 with tf.GradientTape() as tape:
                     loss_value = loss(model, input_par, targets)
@@ -156,7 +158,7 @@ def main(args):
             tf.summary.scalar('loss', val_epoch_loss_avg.result(), step=epoch)
             tf.summary.scalar('accuracy', val_epoch_accuracy.result(), step=epoch)
 
-        template = 'Epoch {}, Loss: {}, Accuracy: {}, Test Loss: {}, Test Accuracy: {}'
+        template = 'Epoch {}, Loss: {}, Accuracy: {}%, Test Loss: {}, Test Accuracy: {}%'
         print (template.format(epoch+1,
                          epoch_loss_avg.result(), 
                          epoch_accuracy.result()*100,
@@ -170,9 +172,38 @@ def main(args):
         val_epoch_accuracy.reset_states()
 
     # Save the model after training
-    save_path = 'models/1/'
     pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)  
-    tf.saved_model.save(gnn, save_path)
+    gnn.save_weights(save_path, save_format='tf')
+
+def evaluate(args):
+    net_args = (N, n_targets, n_features, args.hidden)
+    net_kwargs = {"fr_activation": 0, "fo_activation": 0, "fc_activation": 0}
+    
+    gnn = LEIA(*net_args, **net_kwargs)
+    gnn.build(input_shape=(None, N, n_features))
+    gnn.load_weights(save_path)
+    
+    data_val.set_file_names(files_val)
+    n_val=data_val.count_data()
+        
+    epoch_loss = tf.keras.metrics.Mean('loss', dtype=tf.float32)
+    epoch_accuracy = tf.keras.metrics.CategoricalAccuracy('accuracy')
+
+    # Validation
+    for sub_X, sub_Y in tqdm.tqdm(data_val.generate_data(),total = n_val/batch_size):
+        training = sub_X.astype(np.float32)[:,:,[3,0,1,2]]
+        target = sub_Y.astype(np.float32)[:,-6:-1]
+        
+        # Compute the loss
+        loss_value = loss(gnn, training, target)
+        
+        # Track progress
+        epoch_loss(loss_value)
+        epoch_accuracy(target, tf.nn.softmax(gnn(training)))
+        
+    template = 'Loss: {}, Accuracy: {}%'
+    print (template.format(epoch_loss.result(), 
+                     epoch_accuracy.result()*100))
 
 if __name__ == "__main__":
     """ This is executed when run from the command line """
@@ -181,7 +212,9 @@ if __name__ == "__main__":
     # Required positional arguments
     
     # Optional arguments
-    parser.add_argument("--hidden", type=int, action='store', dest='hidden', default = 16, help="hidden")
+    parser.add_argument("--hidden", type=int, action='store', dest='hidden', default = 16, help="hidden parameter")
+    parser.add_argument("--eval", action='store_true', dest='evaluate', default = False, help="only run evaluation")
 
     args = parser.parse_args()
-    main(args)
+    if not args.evaluate: main(args)
+    else: evaluate(args)
