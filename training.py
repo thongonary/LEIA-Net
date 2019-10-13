@@ -32,7 +32,7 @@ n_targets = 5 # number of classes
 n_features = 4 # number of features per particles
 save_path = 'models/2/'
 batch_size = 256
-n_epochs = 100
+n_epochs = 10
 
 files = glob.glob(train_path + "/jetImage*_{}p*.h5".format(N))
 num_files = len(files)
@@ -97,7 +97,8 @@ def main(args):
 
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
     test_summary_writer = tf.summary.create_file_writer(test_log_dir)
-
+    
+    best_loss = 100
     for epoch in range(n_epochs):
         
         # Tool to keep track of the metrics
@@ -149,7 +150,16 @@ def main(args):
         train_accuracy_results.append(epoch_accuracy.result())
         val_loss_results.append(val_epoch_loss_avg.result())
         val_accuracy_results.append(val_epoch_accuracy.result())
-        
+       
+        # Save best epoch only
+        if best_loss < val_epoch_loss_avg.result():
+            best_loss = val_epoch_loss_avg.result()
+
+            # Save the model after training
+            best_path = save_path + '/best/'
+            pathlib.Path(best_path).mkdir(parents=True, exist_ok=True)  
+            gnn.save_weights(best_path, save_format='tf')
+
         # Logs for tensorboard
         with train_summary_writer.as_default():
             tf.summary.scalar('loss', epoch_loss_avg.result(), step=epoch)
