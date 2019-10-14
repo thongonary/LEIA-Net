@@ -31,6 +31,7 @@ N = 100 # number of particles
 n_targets = 5 # number of classes
 n_features = 4 # number of features per particles
 save_path = 'models/2/'
+best_path = save_path + '/best/'
 batch_size = 256
 n_epochs = 10
 
@@ -137,7 +138,6 @@ def main(args):
             training = sub_X.astype(np.float32)[:,:,[3,0,1,2]]
             target = sub_Y.astype(np.float32)[:,-6:-1]
             
-            
             # Compute the loss
             loss_value = loss(gnn, training, target)
             
@@ -152,11 +152,10 @@ def main(args):
         val_accuracy_results.append(val_epoch_accuracy.result())
        
         # Save best epoch only
-        if best_loss < val_epoch_loss_avg.result():
+        if best_loss > val_epoch_loss_avg.result():
             best_loss = val_epoch_loss_avg.result()
 
             # Save the model after training
-            best_path = save_path + '/best/'
             pathlib.Path(best_path).mkdir(parents=True, exist_ok=True)  
             gnn.save_weights(best_path, save_format='tf')
 
@@ -191,7 +190,7 @@ def evaluate(args):
     
     gnn = LEIA(*net_args, **net_kwargs)
     gnn.build(input_shape=(None, N, n_features))
-    gnn.load_weights(save_path)
+    gnn.load_weights(best_path)
     
     data_val.set_file_names(files_val)
     n_val=data_val.count_data()
