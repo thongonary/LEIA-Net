@@ -18,6 +18,8 @@ import tensorflow as tf
 from tensorflow.keras import layers, models
 from interaction import LEIA
 from data import H5Data
+import copy
+import h5py
 
 os.environ['HDF5_USE_FILE_LOCKING'] = 'FALSE'
 if os.path.isdir('/data/shared/hls-fml/'):
@@ -29,8 +31,8 @@ elif os.path.isdir('/eos/project/d/dshep/hls-fml/'):
 
 N = 100 # number of particles
 n_targets = 5 # number of classes
-n_features = 4 # number of features per particles
-save_path = 'models/2/'
+n_features = 16 # number of features per particles
+save_path = 'models/6/'
 best_path = save_path + '/best/'
 batch_size = 256
 n_epochs = 10
@@ -39,7 +41,7 @@ files = glob.glob(train_path + "/jetImage*_{}p*.h5".format(N))
 num_files = len(files)
 files_val = files[:int(num_files*0.2)] # take first 20% for validation
 files_train = files[int(num_files*0.2):] # take rest for training
-    
+files_trial = files[int(num_files*0.2):int(num_files*0.3)] 
 data_train = H5Data(batch_size = batch_size,
                     cache = None,
                     preloading=0,
@@ -60,9 +62,24 @@ def loss(model, x, y):
     y_ = model(x)
     return cce(y_true=y, y_pred=y_)
 
+def normalize(files, feature_name='jetConstituentList'):
+    # Return the mean and std for normalization
+    trial_file = h5py.File(files[0],"r")
+    sample = trial_file[feature_name]
+    print(f"Getting mean and std from a sample of {len(sample)} events")
+    sample = np.reshape(sample, [-1, sample.shape[-1]])
+    mean = np.mean(sample, axis=0).astype(np.float32)
+    std = np.std(sample, axis=0).astype(np.float32)
+    print(f"Mean = {mean}")
+    print(f"Std = {std}")
+    return mean, std
+
 def main(args):
     """ Main entry point of the app """
-    data_train.set_file_names(files_train)
+    if args.trial: 
+        data_train.set_file_names(files_trial)
+    else:    
+        data_train.set_file_names(files_train)
     data_val.set_file_names(files_val)
     
     n_val=data_val.count_data()
@@ -76,7 +93,7 @@ def main(args):
     
     gnn = LEIA(*net_args, **net_kwargs)
     gnn.build(input_shape=(None, N, n_features))
-    
+
     # gnn.summary() # Doens't work. Seems like a common TF 2.0 issue: 
     # https://github.com/tensorflow/tensorflow/issues/22963 
     # https://stackoverflow.com/questions/58182032/you-tried-to-call-count-params-on-but-the-layer-isnt-built-tensorflow-2-0
@@ -99,6 +116,9 @@ def main(args):
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
     test_summary_writer = tf.summary.create_file_writer(test_log_dir)
     
+    # Load mean and std for normalization
+    mean, std = normalize(files_train)
+    
     best_loss = 100
     for epoch in range(n_epochs):
         
@@ -112,7 +132,7 @@ def main(args):
         for sub_X, sub_Y in tqdm.tqdm(data_train.generate_data(),total = n_train/batch_size):
 #            print(f"sub_X: {sub_X.shape}")
 #            print(f"sub_Y: {sub_Y.shape}")
-            training = sub_X.astype(np.float32)[:,:,[3,0,1,2]]
+            training = (sub_X.astype(np.float32) - mean)/std #[3,0,1,2]]
             target = sub_Y.astype(np.float32)[:,-6:-1]
             def grad(model, input_par, targets):
                 with tf.GradientTape() as tape:
@@ -120,14 +140,14 @@ def main(args):
                 return loss_value, tape.gradient(loss_value, model.trainable_variables)
             
             # Define optimizer
-            optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
 
             # Compute loss and gradients
             loss_value, grads = grad(gnn, training, target)
-
+            
             # Update the gradients
             optimizer.apply_gradients(zip(grads, gnn.trainable_variables))
-
+            
             # Track progress
             epoch_loss_avg(loss_value)  # Add current batch loss
             # Compare predicted label to actual label
@@ -135,7 +155,7 @@ def main(args):
 
         # Validation
         for sub_X, sub_Y in tqdm.tqdm(data_val.generate_data(),total = n_val/batch_size):
-            training = sub_X.astype(np.float32)[:,:,[3,0,1,2]]
+            training = (sub_X.astype(np.float32) - mean)/std #[3,0,1,2]]
             target = sub_Y.astype(np.float32)[:,-6:-1]
             
             # Compute the loss
@@ -156,8 +176,8 @@ def main(args):
             best_loss = val_epoch_loss_avg.result()
 
             # Save the model after training
-            pathlib.Path(best_path).mkdir(parents=True, exist_ok=True)  
-            gnn.save_weights(best_path, save_format='tf')
+            #pathlib.Path(best_path).mkdir(parents=True, exist_ok=True)  
+            #gnn.save_weights(best_path, save_format='tf')
 
         # Logs for tensorboard
         with train_summary_writer.as_default():
@@ -167,7 +187,7 @@ def main(args):
             tf.summary.scalar('loss', val_epoch_loss_avg.result(), step=epoch)
             tf.summary.scalar('accuracy', val_epoch_accuracy.result(), step=epoch)
 
-        template = 'Epoch {}, Loss: {}, Accuracy: {}%, Test Loss: {}, Test Accuracy: {}%'
+        template = 'Epoch {}, Loss: {:.4f}, Accuracy: {:.2f}%, Test Loss: {:.4f}, Test Accuracy: {:.2f}%'
         print (template.format(epoch+1,
                          epoch_loss_avg.result(), 
                          epoch_accuracy.result()*100,
@@ -181,12 +201,12 @@ def main(args):
         val_epoch_accuracy.reset_states()
 
     # Save the model after training
-    pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)  
-    gnn.save_weights(save_path, save_format='tf')
+#    pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)  
+#    gnn.save_weights(save_path, save_format='tf')
 
 def evaluate(args):
     net_args = (N, n_targets, n_features, args.hidden)
-    net_kwargs = {"fr_activation": 0, "fo_activation": 0, "fc_activation": 0}
+    net_kwargs = {"fr_activation": 0, "fo_activation": 0, "fc_activation": 0, "De": args.De, "Do": args.Do}
     
     gnn = LEIA(*net_args, **net_kwargs)
     gnn.build(input_shape=(None, N, n_features))
@@ -197,6 +217,9 @@ def evaluate(args):
         
     epoch_loss = tf.keras.metrics.Mean('loss', dtype=tf.float32)
     epoch_accuracy = tf.keras.metrics.CategoricalAccuracy('accuracy')
+    
+    # Load mean and std for normalization
+    mean, std = normalize(files_train)
 
     # Validation
     for sub_X, sub_Y in tqdm.tqdm(data_val.generate_data(),total = n_val/batch_size):
@@ -221,8 +244,11 @@ if __name__ == "__main__":
     # Required positional arguments
     
     # Optional arguments
-    parser.add_argument("--hidden", type=int, action='store', dest='hidden', default = 16, help="hidden parameter")
-    parser.add_argument("--eval", action='store_true', dest='evaluate', default = False, help="only run evaluation")
+    parser.add_argument("--hidden", type=int, action='store', dest='hidden', default = 128, help="hidden parameter")
+    parser.add_argument("--De", type=int, action='store', dest='De', default = 64, help="De parameter")
+    parser.add_argument("--Do", type=int, action='store', dest='Do', default = 64, help="Do parameter")
+    parser.add_argument("--evaluate", action='store_true', dest='evaluate', default = False, help="only run evaluation")
+    parser.add_argument("--trial", action='store_true', dest='trial', default = False, help="train on a smaller sample")
 
     args = parser.parse_args()
     if not args.evaluate: main(args)

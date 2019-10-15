@@ -10,7 +10,7 @@ import numpy as np
 from lbn import LBNLayer
 
 class LEIA(models.Model):
-    def __init__(self, n_constituents, n_targets, params, hidden, fr_activation=0, fo_activation=0, fc_activation=0, sum_O=True, debug=False):
+    def __init__(self, n_constituents, n_targets, params, hidden, fr_activation=0, fo_activation=0, fc_activation=0, De=8, Do=8, sum_O=True, debug=False):
         super(LEIA, self).__init__()
 
         # initialize the LBN layer for preprocessing
@@ -21,22 +21,22 @@ class LEIA(models.Model):
         self.N = self.lbn.lbn.n_out
         self.Nr = self.N * (self.N - 1)
         self.Dr = 0
-        self.De = 8
+        self.De = De
         self.Dx = 0
-        self.Do = 8
+        self.Do = Do
         self.n_targets = n_targets
         self.fr_activation = fr_activation
         self.fo_activation = fo_activation
         self.fc_activation = fc_activation 
         self.assign_matrices()
         self.Ra = tf.ones([self.Dr, self.Nr])
-        self.fr1 = layers.Dense(self.hidden, input_shape=(2 * self.P + self.Dr,))
-        self.fr2 = layers.Dense(int(self.hidden/2), input_shape=(self.hidden,))
-        self.fr3 = layers.Dense(self.De, input_shape=(int(self.hidden/2),))
+        self.fr1 = layers.Dense(self.hidden) #, input_shape=(2 * self.P + self.Dr,)
+        self.fr2 = layers.Dense(int(self.hidden/2)) # , input_shape=(self.hidden,)
+        self.fr3 = layers.Dense(self.De) # , input_shape=(int(self.hidden/2),)
         
-        self.fo1 = layers.Dense(self.hidden, input_shape=(self.P + self.Dx + (2 * self.De),))
-        self.fo2 = layers.Dense(int(self.hidden/2), input_shape=(self.hidden,))
-        self.fo3 = layers.Dense(self.Do, input_shape=(int(self.hidden/2),))
+        self.fo1 = layers.Dense(self.hidden) # , input_shape=(self.P + self.Dx + (2 * self.De),)
+        self.fo2 = layers.Dense(int(self.hidden/2)) # , input_shape=(self.hidden,)
+        self.fo3 = layers.Dense(self.Do) # , input_shape=(int(self.hidden/2),)
         
         self.fc1 = layers.Dense(hidden)
         self.fc2 = layers.Dense(int(hidden/2))
@@ -65,7 +65,7 @@ class LEIA(models.Model):
         '''
         ###PF Candidate - PF Candidate###
         if self.debug: print("input_shape = {}".format(x.shape))
-        x = self.lbn(x) # Already in E, px, py, pz
+        #x = self.lbn(x) # Already in E, px, py, pz # Bypass for now, just to check if the IN works
         if self.debug: 
             print("input_shape after lbn = {}".format(x.shape))
             print("n_outs after lbn = {}".format(self.lbn.lbn.n_out))
