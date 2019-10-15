@@ -511,10 +511,10 @@ class LBNLayer(tf.keras.layers.Layer):
             setattr(self, weight_name, W)
             setattr(self.lbn, weight_name, W)
 
-        # add weights, depending on the boost mode
-        add_weight("particle", self.lbn.n_particles)
-        if self.lbn.boost_mode != LBN.COMBINATIONS:
-            add_weight("restframe", self.lbn.n_restframes)
+        # add weights, depending on the boost mode. Doesn't need for now
+        # add_weight("particle", self.lbn.n_particles)
+        #if self.lbn.boost_mode != LBN.COMBINATIONS:
+        #    add_weight("restframe", self.lbn.n_restframes)
 
         super(LBNLayer, self).build(input_shape)
 
@@ -523,7 +523,7 @@ class LBNLayer(tf.keras.layers.Layer):
         return self.lbn(inputs, features=self.feature_names)
 
     def compute_output_shape(self, input_shape):
-        return (input_shape[0], self.lbn.n_features)
+        return (input_shape[0], self.lbn.n_out, 4) # Adhoc for now
 
 
 class FeatureFactoryBase(object):
