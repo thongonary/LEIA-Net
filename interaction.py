@@ -53,7 +53,7 @@ class LEIA(models.Model):
         Rs = np.zeros([self.N, self.Nr], dtype=np.float32)
         receiver_sender_list = [i for i in itertools.product(range(self.N), range(self.N)) if i[0]!=i[1]]
         for i, (r, s) in enumerate(receiver_sender_list):
-            Rr[r, i]  = 1
+            Rr[r, i] = 1
             Rs[s, i] = 1
         self.Rr = tf.convert_to_tensor(Rr)
         self.Rs = tf.convert_to_tensor(Rs)
@@ -64,9 +64,12 @@ class LEIA(models.Model):
         Expect input to have shape of (batches, N_particles, N_features)
         '''
         ###PF Candidate - PF Candidate###
-        if self.debug: print("input_shape = {}".format(x.shape))
-        #x = self.lbn(x) # Already in E, px, py, pz # Bypass for now, just to check if the IN works
         if self.debug: 
+            print("input_shape = {}".format(x.shape))
+            print(f"x before lbn : {x[0,0,:]}")
+        x = self.lbn(x) # Already in E, px, py, pz # Bypass for now, just to check if the IN works
+        if self.debug: 
+            print(f"x after lbn : {x[0,0,:]}\n")
             print("input_shape after lbn = {}".format(x.shape))
             print("n_outs after lbn = {}".format(self.lbn.lbn.n_out))
         x = tf.transpose(x, perm=[0, 2, 1]) # to fit in the IN

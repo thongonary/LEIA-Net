@@ -31,11 +31,11 @@ elif os.path.isdir('/eos/project/d/dshep/hls-fml/'):
 
 N = 100 # number of particles
 n_targets = 5 # number of classes
-n_features = 16 # number of features per particles
-save_path = 'models/6/'
+n_features = 4 # number of features per particles
+save_path = 'models/8/'
 best_path = save_path + '/best/'
 batch_size = 256
-n_epochs = 10
+n_epochs = 100
 
 files = glob.glob(train_path + "/jetImage*_{}p*.h5".format(N))
 num_files = len(files)
@@ -132,7 +132,8 @@ def main(args):
         for sub_X, sub_Y in tqdm.tqdm(data_train.generate_data(),total = n_train/batch_size):
 #            print(f"sub_X: {sub_X.shape}")
 #            print(f"sub_Y: {sub_Y.shape}")
-            training = (sub_X.astype(np.float32) - mean)/std #[3,0,1,2]]
+#            training = ((sub_X.astype(np.float32) - mean)/std)[:,:,[3,0,1,2]]
+            training = sub_X.astype(np.float32)[:,:,[3,0,1,2]]
             target = sub_Y.astype(np.float32)[:,-6:-1]
             def grad(model, input_par, targets):
                 with tf.GradientTape() as tape:
@@ -155,7 +156,8 @@ def main(args):
 
         # Validation
         for sub_X, sub_Y in tqdm.tqdm(data_val.generate_data(),total = n_val/batch_size):
-            training = (sub_X.astype(np.float32) - mean)/std #[3,0,1,2]]
+            #training = ((sub_X.astype(np.float32) - mean)/std)[:,:,[3,0,1,2]]
+            training = (sub_X.astype(np.float32))[:,:,[3,0,1,2]]
             target = sub_Y.astype(np.float32)[:,-6:-1]
             
             # Compute the loss
@@ -223,6 +225,7 @@ def evaluate(args):
 
     # Validation
     for sub_X, sub_Y in tqdm.tqdm(data_val.generate_data(),total = n_val/batch_size):
+        #training = ((sub_X.astype(np.float32) - mean)/std)[:,:,[3,0,1,2]]
         training = sub_X.astype(np.float32)[:,:,[3,0,1,2]]
         target = sub_Y.astype(np.float32)[:,-6:-1]
         
